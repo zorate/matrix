@@ -46,7 +46,7 @@ When a new node joins the ecosystem, the communication process follows a strict 
 
 1. Clone the repository and navigate to the project directory:
    ```bash
-   git clone [https://github.com/your-username/matrix.git](https://github.com/your-username/matrix.git)
+   git clone [https://github.com/zorate/matrix.git](https://github.com/zorate/matrix.git)
    cd matrix
    
 Install the necessary system dependencies:
