@@ -1,0 +1,30 @@
+# --- Environment and Security Signatures ---
+# Never commit your live MongoDB URI or private security hashes
+.env
+.env.local
+.env.*
+*.env
+
+# --- Python Build and Cache Ecosystem ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Operating System Footprints ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# --- IDE and Development Text Configurations ---
+.vscode/
+.idea/
+*.swp
+*.swo
