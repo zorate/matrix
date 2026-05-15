@@ -6,6 +6,8 @@ from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from pymongo import MongoClient
 from utils.crypto import generate_short_id, validate_short_id
+from dotenv import load_dotenv
+from pymongo.errors import ConfigurationError, ServerSelectionTimeoutError
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
@@ -13,11 +15,43 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 # Initialize SocketIO with explicit CORS setups for privacy setups
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+load_dotenv()
 # MongoDB Connection Setup
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/privatemsg')
+MONGO_URI = os.getenv('MONGO_URI') #'mongodb://localhost:27017/privatemsg')
 mongo_client = MongoClient(MONGO_URI)
-db = mongo_client.get_default_database()
+db = mongo_client["TrustCheck"]
 
+if not MONGO_URI:
+    print("\n" + "="*70)
+    print("FATAL CONFIGURATION ERROR: MONGO_URI missing from environment variables.")
+    print("Please check that your .env file exists and contains the variable.")
+    print("="*70 + "\n")
+    sys.exit(1)
+
+# 3. Instantiate connection to MongoDB Atlas Cloud Matrix
+try:
+    # Set a 5-second timeout ceiling so the app doesn't freeze if the cloud is unreachable
+    mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    
+    # Extract the default database name specified in your Atlas URI string ('TrustCheck')
+    db = mongo_client.get_default_database()
+    users_col = db["users"]
+    
+    # Force a rapid network handshake ping to verify credentials and connectivity
+    mongo_client.server_info()
+    print("SUCCESS: Established secure pipeline with MongoDB Atlas cloud clusters.")
+    
+except ConfigurationError as ce:
+    print(f"\nConfiguration error parsing URI mapping: {ce}")
+    print("Double check your connection string syntax inside the .env wrapper.\n")
+    sys.exit(1)
+except ServerSelectionTimeoutError:
+    print("\n" + "="*70)
+    print("FATAL NETWORK ERROR: Unable to communicate with MongoDB Atlas clusters.")
+    print("1. Verify your local machine has an active internet connection.")
+    print("2. Ensure your IP address is whitelisted in the MongoDB Atlas Network Access panel.")
+    print("="*70 + "\n")
+    sys.exit(1)
 # Collections
 users_col = db['users']              # Fields: short_key, public_key
 undelivered_col = db['undelivered_queue']  # Fields: recipient_id, payload, timestamp

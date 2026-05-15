@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>P R I V A T E . E N C L A V E</title>
+<!-- Corrected CDN Scripts for Maximum Stability -->
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socketio/4.7.5/socketio.min.js"></script>
     <style>
         body { font-family: monospace; background-color: #050505; color: #00ff00; }
         .brutalist-border { border: 2px solid #00ff00; }
@@ -79,6 +80,7 @@
     </div>
 
     <!-- Script bootstrapping logical injections -->
-    <script src="/static/js/chat.js"></script>
+    <!-- Added ?v=1 to force the browser to bypass its stored cache memory -->
+    <script src="/static/js/chat.js?v=1"></script>
 </body>
 </html>
