@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P R I V A T E . E N C L A V E</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socketio/4.7.5/socketio.min.js"></script>
+    <style>
+        body { font-family: monospace; background-color: #050505; color: #00ff00; }
+        .brutalist-border { border: 2px solid #00ff00; }
+        .brutalist-bg { background-color: #111; }
+        .active-chat { background-color: #00ff00 !important; color: #000 !important; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #00ff00; }
+    </style>
+</head>
+<body class="p-4 md:p-8 h-screen flex flex-col justify-between max-w-6xl mx-auto">
+
+    <!-- Screen 1: Registration/Activation (Hidden if Key Exists) -->
+    <div id="activation-screen" class="hidden flex-col items-center justify-center my-auto text-center space-y-6">
+        <h1 class="text-3xl font-bold tracking-widest text-white">INITIALIZE NEW PRIVATE NODE</h1>
+        <p class="max-w-md text-sm text-gray-400">Identity is decoupled from physical attributes. Generating keys wholly on-device via WebCrypto framework.</p>
+        <button id="btn-generate" class="brutalist-border px-6 py-3 font-bold hover:bg-green-500 hover:text-black transition duration-150">
+            [ GENERATE NEW CRYPTO ENCLAVE ID ]
+        </button>
+        <div id="generation-status" class="text-xs tracking-wider text-yellow-500 animate-pulse"></div>
+    </div>
+
+    <!-- Screen 2: System Dashboard (Hidden by default until activated) -->
+    <div id="core-application" class="hidden flex-col md:flex-row gap-4 h-full w-full">
+        
+        <!-- Left panel: Control & Peer Registry -->
+        <div class="w-full md:w-1/3 flex flex-col gap-4">
+            <div class="brutalist-border p-4 brutalist-bg">
+                <span class="text-xs text-gray-400 block mb-1">YOUR IDENTITY POINTER:</span>
+                <span id="display-my-id" class="text-2xl font-bold tracking-wider text-white">XXX-XXX</span>
+            </div>
+
+            <div class="brutalist-border p-4 brutalist-bg flex flex-col gap-2">
+                <h3 class="text-sm font-bold border-b border-green-800 pb-1 mb-2">CONNECT PEER</h3>
+                <input id="input-peer-id" type="text" placeholder="XXX-XXX" autocomplete="off" class="bg-black border border-green-800 text-green-400 p-2 text-center tracking-widest font-bold focus:outline-none focus:border-green-400 placeholder-green-900 uppercase">
+                <button id="btn-add-peer" class="brutalist-border py-1 text-sm font-bold hover:bg-green-500 hover:text-black transition">
+                    RESOLVE PUBLIC KEY
+                </button>
+                <div id="peer-lookup-status" class="text-xs text-yellow-600 mt-1"></div>
+            </div>
+
+            <div class="brutalist-border p-4 brutalist-bg flex-1 flex flex-col min-h-[150px]">
+                <h3 class="text-sm font-bold border-b border-green-800 pb-1 mb-2">PEER ROSTER</h3>
+                <div id="peer-list" class="flex flex-col gap-1 overflow-y-auto max-h-[300px]">
+                    <!-- Peers populated here dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right panel: Cipher Text Terminal -->
+        <div class="w-full md:w-2/3 brutalist-border brutalist-bg flex flex-col h-full min-h-[400px]">
+            <!-- Header status mapping -->
+            <div class="border-b border-green-500 p-3 flex justify-between items-center text-xs bg-black">
+                <div>TARGET STATUS: <span id="chat-header-title" class="text-white font-bold">NO PEER SELECTED</span></div>
+                <div class="text-gray-500">[ ZERO KNOWLEDGE TUNNEL ]</div>
+            </div>
+
+            <!-- Terminal Feed Screen -->
+            <div id="chat-feed" class="flex-1 p-4 overflow-y-auto space-y-3 text-sm flex flex-col">
+                <div class="text-center text-gray-600 my-auto">Select a peer sequence from the roster to verify handshake.</div>
+            </div>
+
+            <!-- Message Terminal input -->
+            <form id="chat-input-form" class="border-t border-green-500 flex bg-black p-2 gap-2">
+                <input id="chat-message-field" type="text" placeholder="Type raw string content..." autocomplete="off" disabled class="flex-1 bg-black text-green-400 px-3 py-2 border border-green-900 focus:outline-none focus:border-green-500 disabled:opacity-30">
+                <button type="submit" id="btn-send-message" disabled class="brutalist-border px-6 font-bold hover:bg-green-500 hover:text-black transition disabled:opacity-30">
+                    TRANSMIT
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Script bootstrapping logical injections -->
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>
