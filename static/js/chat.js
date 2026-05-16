@@ -10,10 +10,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const peerLookupStatus = document.getElementById("peer-lookup-status");
     const peerListContainer = document.getElementById("peer-list");
     const chatHeaderTitle = document.getElementById("chat-header-title");
+    const chatHeaderId = document.getElementById("chat-header-id");
+    const btnManageAlias = document.getElementById("btn-manage-alias");
     const chatFeed = document.getElementById("chat-feed");
     const chatInputForm = document.getElementById("chat-input-form");
     const chatMessageField = document.getElementById("chat-message-field");
     const btnSendMessage = document.getElementById("btn-send-message");
+    const fileImportIdentity = document.getElementById("file-import-identity");
 
     let socket = null;
     let myShortId = localStorage.getItem("enclave_short_id");
@@ -21,7 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Cryptographic Helper Subsystems ---
 
-    // ArrayBuffer to string conversion pipelines for serialization
     function arrayBufferToBase64(buffer) {
         let binary = '';
         let bytes = new Uint8Array(buffer);
@@ -42,7 +44,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return bytes.buffer;
     }
 
-    // Generate local RSA keypairs for asymmetric E2E encryption
     async function generateEnclaveKeyPair() {
         return window.crypto.subtle.generateKey(
             {
@@ -51,18 +52,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
                 hash: "SHA-256"
             },
-            true, // extractable
+            true,
             ["encrypt", "decrypt"]
         );
     }
 
-    // Export public crypto keys out into shareable formats
     async function exportPublicKey(key) {
         const exported = await window.crypto.subtle.exportKey("spki", key);
         return arrayBufferToBase64(exported);
     }
 
-    // Import external peer verification keys for encryption pipelines
     async function importPublicKey(pemBase64) {
         const buffer = base64ToArrayBuffer(pemBase64);
         return window.crypto.subtle.importKey(
@@ -74,7 +73,6 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     }
 
-    // Import your private key stored inside local configuration matrixes
     async function importPrivateKey(jwk) {
         return window.crypto.subtle.importKey(
             "jwk",
@@ -85,7 +83,6 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     }
 
-    // Core encryption: plaintext -> cipher array
     async function encryptPayload(plaintext, publicKeyObj) {
         const encoder = new TextEncoder();
         const data = encoder.encode(plaintext);
@@ -97,7 +94,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return arrayBufferToBase64(encrypted);
     }
 
-    // Core decryption: cipher array -> plaintext
     async function decryptPayload(cipherBase64, privateKeyObj) {
         const data = base64ToArrayBuffer(cipherBase64);
         try {
@@ -113,18 +109,31 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // --- Interface State Management ---
+    // --- Interface State & Contact Alias Management ---
 
     function loadPeerRoster() {
         peerListContainer.innerHTML = "";
         const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
+        const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
+        
         Object.keys(peers).forEach(peerId => {
+            const displayName = aliases[peerId] ? aliases[peerId] : `NODE: ${peerId}`;
+            
             const btn = document.createElement("button");
-            btn.className = "w-full text-left p-2 border border-green-900 text-xs hover:bg-green-900 transition flex justify-between";
-            btn.innerHTML = `<span>NODE: ${peerId}</span><span id="unread-${peerId}" class="text-yellow-500 hidden">[NEW]</span>`;
+            btn.className = "w-full text-left p-3 border border-green-900 text-xs hover:bg-green-900/30 transition flex justify-between items-center mb-1 rounded";
+            
             if(peerId === activePeerId) {
-                btn.classList.add("active-chat");
+                btn.classList.add("bg-green-950/60", "border-green-500");
             }
+            
+            btn.innerHTML = `
+                <div class="flex flex-col gap-0.5">
+                    <span class="font-bold text-green-400 text-xs truncate max-w-[160px]">${escapeHtml(displayName)}</span>
+                    <span class="text-[9px] text-gray-500 tracking-wider">${peerId}</span>
+                </div>
+                <span id="unread-${peerId}" class="text-yellow-500 font-bold hidden text-[9px]">[NEW]</span>
+            `;
+            
             btn.onclick = () => selectPeerChat(peerId);
             peerListContainer.appendChild(btn);
         });
@@ -132,14 +141,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function selectPeerChat(peerId) {
         activePeerId = peerId;
-        chatHeaderTitle.innerText = `NODE: ${peerId}`;
+        const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
+        
+        // Update operational tracking frames
+        chatHeaderTitle.innerText = aliases[peerId] ? aliases[peerId] : `NODE: ${peerId}`;
+        chatHeaderId.innerText = `VECTOR REFERENCE: // ${peerId}`;
+        
+        // Unhide controls
+        btnManageAlias.classList.remove("hidden");
         chatMessageField.disabled = false;
         btnSendMessage.disabled = false;
         
         document.getElementById(`unread-${peerId}`)?.classList.add("hidden");
-        loadPeerRoster(); // Refresh highlight states
+        loadPeerRoster(); 
         renderFeedHistory(peerId);
     }
+
+    btnManageAlias.onclick = () => {
+        if (!activePeerId) return;
+        const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
+        const currentAlias = aliases[activePeerId] || "";
+        
+        const newAlias = prompt(`Assign local contact name for node [ ${activePeerId} ] :`, currentAlias);
+        if (newAlias === null) return; // User pressed cancel
+        
+        if (newAlias.trim() === "") {
+            delete aliases[activePeerId];
+        } else {
+            aliases[activePeerId] = newAlias.trim();
+        }
+        
+        localStorage.setItem("matrix_contact_aliases", JSON.stringify(aliases));
+        chatHeaderTitle.innerText = aliases[activePeerId] ? aliases[activePeerId] : `NODE: ${activePeerId}`;
+        loadPeerRoster();
+    };
 
     function renderFeedHistory(peerId) {
         chatFeed.innerHTML = "";
@@ -147,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const feeds = JSON.parse(localStorage.getItem(storageKey) || "[]");
         
         if(feeds.length === 0) {
-            chatFeed.innerHTML = `<div class="text-center text-gray-700 my-auto">Channel structural pipeline open. Send a packet.</div>`;
+            chatFeed.innerHTML = `<div class="text-center text-gray-700 my-auto text-xs">Channel structural pipeline open. Send a packet.</div>`;
             return;
         }
 
@@ -157,8 +192,8 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const timestamp = new Date(msg.time * 1000).toLocaleTimeString();
             wrapper.innerHTML = `
-                <div class="text-[10px] text-gray-500">${msg.sender === 'ME' ? 'LOCAL' : 'PEER'} [${timestamp}]</div>
-                <div class="p-2 brutalist-border bg-black text-green-400 mt-1 rounded whitespace-pre-wrap">${escapeHtml(msg.text)}</div>
+                <div class="text-[9px] text-gray-500 tracking-wide">${msg.sender === 'ME' ? 'LOCAL TRANSMIT' : 'DECRYPTED PEER'} [${timestamp}]</div>
+                <div class="p-2 brutalist-border bg-black text-green-400 mt-1 rounded text-xs whitespace-pre-wrap">${escapeHtml(msg.text)}</div>
             `;
             chatFeed.appendChild(wrapper);
         });
@@ -168,6 +203,64 @@ document.addEventListener("DOMContentLoaded", () => {
     function escapeHtml(str) {
         return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
+
+    // --- Identity Backup Portability Infrastructure ---
+
+    window.exportIdentityToBackupFile = async function() {
+        const myShortId = localStorage.getItem("enclave_short_id");
+        const myPrivateJwk = localStorage.getItem("enclave_private_jwk");
+        const peerRoster = localStorage.getItem("enclave_peers");
+        const contactAliases = localStorage.getItem("matrix_contact_aliases");
+
+        if(!myShortId || !myPrivateJwk) {
+            alert("No configuration metadata detected to process backup loops.");
+            return;
+        }
+
+        const backupPayload = {
+            short_id: myShortId,
+            private_jwk: JSON.parse(myPrivateJwk),
+            peers: JSON.parse(peerRoster || "{}"),
+            aliases: JSON.parse(contactAliases || "{}")
+        };
+
+        const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `matrix_identity_backup_${myShortId}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+    };
+
+    fileImportIdentity.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const importedData = JSON.parse(evt.target.result);
+                if (!importedData.short_id || !importedData.private_jwk) {
+                    alert("Fatal: Cryptographic key vectors are missing from backup structural syntax.");
+                    return;
+                }
+
+                // Commit everything into local phone storage maps directly
+                localStorage.setItem("enclave_short_id", importedData.short_id);
+                localStorage.setItem("enclave_private_jwk", JSON.stringify(importedData.private_jwk));
+                localStorage.setItem("enclave_peers", JSON.stringify(importedData.peers || {}));
+                localStorage.setItem("matrix_contact_aliases", JSON.stringify(importedData.aliases || {}));
+
+                alert("Cryptographic matrix context imported perfectly! Activating application node...");
+                window.location.reload();
+            } catch(err) {
+                alert("Error reading key package mapping layers: " + err);
+            }
+        };
+        reader.readAsText(file);
+    };
 
     // --- Initialization and Orchestration Pipelines ---
 
@@ -196,7 +289,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const exportedPublic = await exportPublicKey(keyPair.publicKey);
             const exportedPrivateJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
             
-            // Post public pointer configuration structure to target server allocations
             const response = await fetch('/api/identity/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -223,10 +315,10 @@ document.addEventListener("DOMContentLoaded", () => {
     btnAddPeer.onclick = async () => {
         const lookupVal = inputPeerId.value.toUpperCase().trim();
         if(!lookupVal || lookupVal.length !== 7) {
-            peerLookupStatus.innerText = "Error: Input must evaluate to exact XXX-XXX formatting rules.";
+            peerLookupStatus.innerText = "Error: Use XXX-XXX layout.";
             return;
         }
-        peerLookupStatus.innerText = "Querying distributed routing indexes...";
+        peerLookupStatus.innerText = "Querying cluster indexes...";
         
         try {
             const res = await fetch(`/api/identity/lookup/${lookupVal}`);
@@ -243,39 +335,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 peerLookupStatus.innerText = `Failed: ${data.error}`;
             }
         } catch(e) {
-            peerLookupStatus.innerText = "Network pipeline translation drop.";
+            peerLookupStatus.innerText = "Network pipeline timeout.";
         }
     };
 
     function initializeWebsocketSession() {
-        // FIXED: Removed invalid "{ transparent: true }" configuration which breaks the pipeline initialization.
         socket = io();
 
         socket.on('connect', () => {
             console.log("Enclave network link established.");
-            // Immediately authenticate routing parameters
             socket.emit('authenticate', { short_key: myShortId });
         });
 
         socket.on('disconnect', () => {
-            console.warn("Enclave network link dropped. Retrying transport connection...");
+            console.warn("Transport connection terminated.");
         });
 
         socket.on('receive_message', async (packet) => {
             const sender = packet.sender_id;
             const encryptedPayload = packet.payload;
             
-            // Look up verification keys inside local stores
             const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
             if (!peers[sender]) {
-                // Out-of-band message from unrecognized node. Force automated resolution on-the-fly
                 try {
                     const res = await fetch(`/api/identity/lookup/${sender}`);
                     if (res.ok) {
                         const data = await res.json();
                         peers[sender] = data.public_key;
                         localStorage.setItem("enclave_peers", JSON.stringify(peers));
-                    } else { return; } // Drop unverified packet structures
+                    } else { return; } 
                 } catch(e) { return; }
             }
 
@@ -283,7 +371,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const privateKeyObj = await importPrivateKey(myPrivateJwk);
             const decryptedString = await decryptPayload(encryptedPayload, privateKeyObj);
 
-            // Commit transaction to localized structural state storage records
             const storageKey = `msg_feed_${sender}`;
             const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
             history.push({
@@ -307,9 +394,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const txt = chatMessageField.value.trim();
         if(!txt || !activePeerId) return;
 
-        // CRITICAL CHECK: Block transmissions if socket connection has dropped
         if (!socket || !socket.connected) {
-            alert("Transmission pipeline offline. Re-establishing connection with server network...");
+            alert("Transmission pipeline offline. Unable to complete packet exchange.");
             return;
         }
 
@@ -321,16 +407,13 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const targetPubKeyObj = await importPublicKey(targetPublicKeyPEM);
             const cipherText = await encryptPayload(txt, targetPubKeyObj);
-            
             const timestamp = Math.floor(Date.now() / 1000);
             
-            // Transmit direct array states down sockets safely
             socket.emit('send_msg', {
                 recipient_id: activePeerId,
                 encrypted_payload: cipherText
             });
 
-            // Commit output vectors internally locally
             const storageKey = `msg_feed_${activePeerId}`;
             const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
             history.push({
@@ -342,10 +425,9 @@ document.addEventListener("DOMContentLoaded", () => {
             renderFeedHistory(activePeerId);
 
         } catch(err) {
-            alert("Cryptographic transmission failure matching parameters: " + err);
+            alert("Cryptographic processing failure: " + err);
         }
     };
 
-    // Instantiate Startup Sequences
     bootstrapNode();
 });

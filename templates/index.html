@@ -1,86 +1,100 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full bg-black text-green-400 font-mono">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P R I V A T E . E N C L A V E</title>
-<!-- Corrected CDN Scripts for Maximum Stability -->
+    <title>MATRIX // ENCLAVE</title>
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: monospace; background-color: #050505; color: #00ff00; }
-        .brutalist-border { border: 2px solid #00ff00; }
-        .brutalist-bg { background-color: #111; }
-        .active-chat { background-color: #00ff00 !important; color: #000 !important; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #00ff00; }
+        .brutalist-border { border: 2px solid #047857; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #047857; }
     </style>
 </head>
-<body class="p-4 md:p-8 h-screen flex flex-col justify-between max-w-6xl mx-auto">
+<body class="h-full flex flex-col m-0 p-4 justify-center items-center select-none bg-radial from-gray-900 to-black">
 
-    <!-- Screen 1: Registration/Activation (Hidden if Key Exists) -->
-    <div id="activation-screen" class="hidden flex-col items-center justify-center my-auto text-center space-y-6">
-        <h1 class="text-3xl font-bold tracking-widest text-white">INITIALIZE NEW PRIVATE NODE</h1>
-        <p class="max-w-md text-sm text-gray-400">Identity is decoupled from physical attributes. Generating keys wholly on-device via WebCrypto framework.</p>
-        <button id="btn-generate" class="brutalist-border px-6 py-3 font-bold hover:bg-green-500 hover:text-black transition duration-150">
-            [ GENERATE NEW CRYPTO ENCLAVE ID ]
+    <!-- SCREEN 1: GENERATION INTERFACE -->
+    <div id="activation-screen" class="hidden w-full max-w-md p-6 brutalist-border bg-black flex-col gap-4 shadow-2xl">
+        <h1 class="text-xl font-bold border-b border-green-800 pb-2 text-center text-green-500">// MATRIX NODE INITIALIZATION</h1>
+        <p class="text-xs text-gray-400 leading-relaxed">
+            No central identity account detected. Generate a brand new local cryptographic pair or restore an existing identity token from an offline configuration backup file.
+        </p>
+        <button id="btn-generate" class="w-full py-3 bg-green-900 hover:bg-green-700 text-black font-bold tracking-widest text-xs transition duration-150 active:translate-y-0.5">
+            [ INITIALIZE NEW KEYPAIR MASTER INDEX ]
         </button>
-        <div id="generation-status" class="text-xs tracking-wider text-yellow-500 animate-pulse"></div>
+        
+        <div class="border-t border-gray-900 my-2 pt-4 flex flex-col gap-2">
+            <span class="text-[10px] text-gray-500 font-bold uppercase">Import Local Node Key File:</span>
+            <input type="file" id="file-import-identity" class="hidden" accept=".json" />
+            <button onclick="document.getElementById('file-import-identity').click()" class="w-full py-2 border border-dashed border-green-800 text-gray-400 hover:text-green-400 hover:border-green-500 text-xs transition">
+                [ LOAD IDENTITY BACKUP FILE (.JSON) ]
+            </button>
+        </div>
+        
+        <div id="generation-status" class="text-[10px] text-yellow-600 font-bold text-center animate-pulse mt-2"></div>
     </div>
 
-    <!-- Screen 2: System Dashboard (Hidden by default until activated) -->
-    <div id="core-application" class="hidden flex-col md:flex-row gap-4 h-full w-full">
+    <!-- SCREEN 2: ACTIVE SECURE MATRIX COMMS TERMINAL -->
+    <div id="core-application" class="hidden w-full max-w-5xl h-[85vh] brutalist-border bg-black flex shadow-2xl">
         
-        <!-- Left panel: Control & Peer Registry -->
-        <div class="w-full md:w-1/3 flex flex-col gap-4">
-            <div class="brutalist-border p-4 brutalist-bg">
-                <span class="text-xs text-gray-400 block mb-1">YOUR IDENTITY POINTER:</span>
-                <span id="display-my-id" class="text-2xl font-bold tracking-wider text-white">XXX-XXX</span>
-            </div>
-
-            <div class="brutalist-border p-4 brutalist-bg flex flex-col gap-2">
-                <h3 class="text-sm font-bold border-b border-green-800 pb-1 mb-2">CONNECT PEER</h3>
-                <input id="input-peer-id" type="text" placeholder="XXX-XXX" autocomplete="off" class="bg-black border border-green-800 text-green-400 p-2 text-center tracking-widest font-bold focus:outline-none focus:border-green-400 placeholder-green-900 uppercase">
-                <button id="btn-add-peer" class="brutalist-border py-1 text-sm font-bold hover:bg-green-500 hover:text-black transition">
-                    RESOLVE PUBLIC KEY
-                </button>
-                <div id="peer-lookup-status" class="text-xs text-yellow-600 mt-1"></div>
-            </div>
-
-            <div class="brutalist-border p-4 brutalist-bg flex-1 flex flex-col min-h-[150px]">
-                <h3 class="text-sm font-bold border-b border-green-800 pb-1 mb-2">PEER ROSTER</h3>
-                <div id="peer-list" class="flex flex-col gap-1 overflow-y-auto max-h-[300px]">
-                    <!-- Peers populated here dynamically -->
+        <!-- SIDEBAR INDEX CONTROLLERS -->
+        <div class="w-80 border-r border-green-900 flex flex-col bg-black">
+            <!-- CURRENT SECURE USER IDENTITY STAMP -->
+            <div class="p-4 border-b border-green-900 bg-zinc-950 flex flex-col gap-1">
+                <span class="text-[10px] text-gray-500 font-bold">LOCAL NODE LOGICAL VECTOR:</span>
+                <div class="flex items-center justify-between">
+                    <span id="display-my-id" class="text-sm font-bold tracking-wider text-green-500">XXX-XXX</span>
+                    <button onclick="exportIdentityToBackupFile()" class="text-[10px] bg-green-950 hover:bg-green-900 text-green-400 px-2 py-1 border border-green-800 transition" title="Backup keys for phone transfer">
+                        [ BACKUP ]
+                    </button>
                 </div>
             </div>
+
+            <!-- ADD NEW TARGET NODE ADAPTER -->
+            <div class="p-4 border-b border-green-900 flex flex-col gap-2">
+                <span class="text-[10px] text-gray-500 font-bold">LINK PEER COMMUNICATIONS INTERFACE:</span>
+                <div class="flex gap-2">
+                    <input type="text" id="input-peer-id" placeholder="XXX-XXX" class="flex-1 bg-black p-2 border border-green-900 text-green-400 text-xs focus:outline-none focus:border-green-500 uppercase tracking-widest text-center" maxlength="7"/>
+                    <button id="btn-add-peer" class="px-3 bg-green-900 hover:bg-green-700 text-black font-bold text-xs transition">+</button>
+                </div>
+                <div id="peer-lookup-status" class="text-[10px] text-gray-500 font-bold min-h-[12px]"></div>
+            </div>
+
+            <!-- SORTED LIVE DIRECT ROSTER PANELS -->
+            <div id="peer-list" class="flex-1 overflow-y-auto p-2 flex flex-col gap-1 bg-black"></div>
         </div>
 
-        <!-- Right panel: Cipher Text Terminal -->
-        <div class="w-full md:w-2/3 brutalist-border brutalist-bg flex flex-col h-full min-h-[400px]">
-            <!-- Header status mapping -->
-            <div class="border-b border-green-500 p-3 flex justify-between items-center text-xs bg-black">
-                <div>TARGET STATUS: <span id="chat-header-title" class="text-white font-bold">NO PEER SELECTED</span></div>
-                <div class="text-gray-500">[ ZERO KNOWLEDGE TUNNEL ]</div>
+        <!-- MAIN TERMINAL SCREEN CHAT MATRIX -->
+        <div class="flex-1 flex flex-col bg-black">
+            <!-- CHAT NODE HEADER ELEMENT -->
+            <div class="p-4 border-b border-green-900 bg-zinc-950 flex items-center justify-between">
+                <div class="flex flex-col">
+                    <span id="chat-header-title" class="text-sm font-bold tracking-wider text-green-400">UNLINKED MATRIX FIELD</span>
+                    <span id="chat-header-id" class="text-[9px] text-gray-600 tracking-widest font-bold mt-0.5"></span>
+                </div>
+                <!-- LOCAL MANAGEMENT CONTROLS -->
+                <button id="btn-manage-alias" class="hidden text-[10px] border border-green-900 px-2 py-1 hover:bg-green-950 text-gray-400 transition">
+                    [ ASSIGN ALIAS ]
+                </button>
             </div>
 
-            <!-- Terminal Feed Screen -->
-            <div id="chat-feed" class="flex-1 p-4 overflow-y-auto space-y-3 text-sm flex flex-col">
-                <div class="text-center text-gray-600 my-auto">Select a peer sequence from the roster to verify handshake.</div>
+            <!-- DECRYPTED MESSAGE HISTORICAL STREAM -->
+            <div id="chat-feed" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-black">
+                <div class="text-center text-gray-700 my-auto text-xs">Establish secure transmission routing channels via the index panel.</div>
             </div>
 
-            <!-- Message Terminal input -->
-            <form id="chat-input-form" class="border-t border-green-500 flex bg-black p-2 gap-2">
-                <input id="chat-message-field" type="text" placeholder="Type raw string content..." autocomplete="off" disabled class="flex-1 bg-black text-green-400 px-3 py-2 border border-green-900 focus:outline-none focus:border-green-500 disabled:opacity-30">
-                <button type="submit" id="btn-send-message" disabled class="brutalist-border px-6 font-bold hover:bg-green-500 hover:text-black transition disabled:opacity-30">
-                    TRANSMIT
+            <!-- CRYPTOGRAPHIC SUBMISSION BAR -->
+            <form id="chat-input-form" class="p-3 border-t border-green-900 flex gap-2 bg-zinc-950">
+                <input type="text" id="chat-message-field" placeholder="Input payload text packets to transit..." class="flex-1 bg-black p-3 border border-green-900 text-green-400 text-xs focus:outline-none focus:border-green-500" disabled autocomplete="off"/>
+                <button type="submit" id="btn-send-message" class="px-6 bg-green-900 hover:bg-green-700 disabled:bg-zinc-900 disabled:text-gray-700 text-black font-bold text-xs tracking-widest transition" disabled>
+                    TRANSIT
                 </button>
             </form>
         </div>
-
     </div>
 
-    <!-- Script bootstrapping logical injections -->
-    <!-- Added ?v=1 to force the browser to bypass its stored cache memory -->
-    <script src="/static/js/chat.js?v=1"></script>
+    <script src="/static/js/chat.js?v=2"></script>
 </body>
 </html>
