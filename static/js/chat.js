@@ -17,10 +17,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatMessageField = document.getElementById("chat-message-field");
     const btnSendMessage = document.getElementById("btn-send-message");
     const fileImportIdentity = document.getElementById("file-import-identity");
+    const btnRecordAudio = document.getElementById("btn-record-audio");
 
     let socket = null;
     let myShortId = localStorage.getItem("enclave_short_id");
     let activePeerId = null;
+
+    // Audio Recorder States
+    let mediaRecorder = null;
+    let audioChunks = [];
 
     // --- Cryptographic Helper Subsystems ---
 
@@ -83,29 +88,75 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     }
 
-    async function encryptPayload(plaintext, publicKeyObj) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(plaintext);
-        const encrypted = await window.crypto.subtle.encrypt(
-            { name: "RSA-OAEP" },
-            publicKeyObj,
-            data
+    // --- HYBRID ENCRYPTION ENGINE FOR ANY DATA SIZE ---
+
+    async function encryptHybridPayload(rawArrayBuffer, peerPublicKeyObj) {
+        // 1. Spin up an ephemeral, high-strength symmetric AES key
+        const aesKey = await window.crypto.subtle.generateKey(
+            { name: "AES-GCM", length: 256 },
+            true,
+            ["encrypt"]
         );
-        return arrayBufferToBase64(encrypted);
+
+        // 2. Encrypt the raw data with that AES key
+        const iv = window.crypto.getRandomValues(new Uint8Array(12)); // Initialization Vector
+        const encryptedDataBuffer = await window.crypto.subtle.encrypt(
+            { name: "AES-GCM", iv: iv },
+            aesKey,
+            rawArrayBuffer
+        );
+
+        // 3. Export the raw AES key material so we can protect it via RSA
+        const exportedAesRaw = await window.crypto.subtle.exportKey("raw", aesKey);
+
+        // 4. Encrypt the raw AES key using the peer's public RSA key
+        const encryptedAesKeyBuffer = await window.crypto.subtle.encrypt(
+            { name: "RSA-OAEP" },
+            peerPublicKeyObj,
+            exportedAesRaw
+        );
+
+        // 5. Serialize all components to Base64 to build our combined packet payload
+        return JSON.stringify({
+            enc_key: arrayBufferToBase64(encryptedAesKeyBuffer),
+            iv: arrayBufferToBase64(iv),
+            ciphertext: arrayBufferToBase64(encryptedDataBuffer)
+        });
     }
 
-    async function decryptPayload(cipherBase64, privateKeyObj) {
-        const data = base64ToArrayBuffer(cipherBase64);
+    async function decryptHybridPayload(serializedHybridJson, myPrivateKeyObj) {
         try {
-            const decrypted = await window.crypto.subtle.decrypt(
+            const packageObj = JSON.parse(serializedHybridJson);
+            
+            const encryptedAesKeyBuffer = base64ToArrayBuffer(packageObj.enc_key);
+            const iv = new Uint8Array(base64ToArrayBuffer(packageObj.iv));
+            const ciphertextBuffer = base64ToArrayBuffer(packageObj.ciphertext);
+
+            // 1. Decrypt the symmetric AES key using our unique private RSA key
+            const rawAesKeyBuffer = await window.crypto.subtle.decrypt(
                 { name: "RSA-OAEP" },
-                privateKeyObj,
-                data
+                myPrivateKeyObj,
+                encryptedAesKeyBuffer
             );
-            const decoder = new TextDecoder();
-            return decoder.decode(decrypted);
+
+            // 2. Re-import the raw AES key material back into the sandbox browser context
+            const aesKey = await window.crypto.subtle.importKey(
+                "raw",
+                rawAesKeyBuffer,
+                { name: "AES-GCM" },
+                false,
+                ["decrypt"]
+            );
+
+            // 3. Decrypt the primary cipher container straight back to raw binary bytes
+            return await window.crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: iv },
+                aesKey,
+                ciphertextBuffer
+            );
         } catch (e) {
-            return "[ SYSTEM ERROR: FAILED DECRYPTION DEVIATION - STRUCTURAL COMPROMISE ]";
+            console.error("Hybrid core tracking decryption fault:", e);
+            return null;
         }
     }
 
@@ -143,14 +194,13 @@ document.addEventListener("DOMContentLoaded", () => {
         activePeerId = peerId;
         const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
         
-        // Update operational tracking frames
         chatHeaderTitle.innerText = aliases[peerId] ? aliases[peerId] : `NODE: ${peerId}`;
         chatHeaderId.innerText = `VECTOR REFERENCE: // ${peerId}`;
         
-        // Unhide controls
         btnManageAlias.classList.remove("hidden");
         chatMessageField.disabled = false;
         btnSendMessage.disabled = false;
+        btnRecordAudio.disabled = false;
         
         document.getElementById(`unread-${peerId}`)?.classList.add("hidden");
         loadPeerRoster(); 
@@ -163,7 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const currentAlias = aliases[activePeerId] || "";
         
         const newAlias = prompt(`Assign local contact name for node [ ${activePeerId} ] :`, currentAlias);
-        if (newAlias === null) return; // User pressed cancel
+        if (newAlias === null) return;
         
         if (newAlias.trim() === "") {
             delete aliases[activePeerId];
@@ -189,11 +239,24 @@ document.addEventListener("DOMContentLoaded", () => {
         feeds.forEach(msg => {
             const wrapper = document.createElement("div");
             wrapper.className = `flex flex-col max-w-[80%] ${msg.sender === 'ME' ? 'self-end items-end' : 'self-start items-start'}`;
-            
             const timestamp = new Date(msg.time * 1000).toLocaleTimeString();
+            
+            let payloadHtml = "";
+            
+            // Check if packet data stream contains a structured voice note signature
+            if (msg.type === "voice") {
+                payloadHtml = `
+                    <div class="p-2 brutalist-border bg-zinc-950 mt-1 rounded flex items-center gap-2">
+                        <span class="text-xs">🎵 [VOICE]</span>
+                        <audio src="${msg.text}" controls class="h-8 max-w-[210px] filter invert sepia hue-rotate-60 brightness-75"></audio>
+                    </div>`;
+            } else {
+                payloadHtml = `<div class="p-2 brutalist-border bg-black text-green-400 mt-1 rounded text-xs whitespace-pre-wrap">${escapeHtml(msg.text)}</div>`;
+            }
+            
             wrapper.innerHTML = `
                 <div class="text-[9px] text-gray-500 tracking-wide">${msg.sender === 'ME' ? 'LOCAL TRANSMIT' : 'DECRYPTED PEER'} [${timestamp}]</div>
-                <div class="p-2 brutalist-border bg-black text-green-400 mt-1 rounded text-xs whitespace-pre-wrap">${escapeHtml(msg.text)}</div>
+                ${payloadHtml}
             `;
             chatFeed.appendChild(wrapper);
         });
@@ -202,6 +265,139 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function escapeHtml(str) {
         return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // --- Audio Voice Recording Engine ---
+
+    let isRecording = false;
+
+    async function startRecordingVoice() {
+        if (!activePeerId || isRecording) return;
+        audioChunks = [];
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                // Terminate recording devices gracefully to save battery
+                stream.getTracks().forEach(track => track.stop());
+                
+                if (audioChunks.length === 0) return;
+                
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                
+                // Route directly to transmission handler
+                await sendSecureMediaPacket(arrayBuffer, "voice");
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            btnRecordAudio.innerText = "🛑";
+            btnRecordAudio.classList.remove("text-green-500");
+            btnRecordAudio.classList.add("text-red-500", "animate-pulse");
+            chatMessageField.placeholder = "!!! RECORDING RAW SECURE AUDIO PAYLOAD DIRECTLY FROM CAPTURE LAYER !!!";
+            chatMessageField.classList.add("border-red-900", "text-red-500");
+        } catch (err) {
+            alert("Microphone capture permission request rejected: " + err);
+            resetRecordButtonUI();
+        }
+    }
+
+    function stopRecordingVoice() {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+        }
+        resetRecordButtonUI();
+    }
+
+    function resetRecordButtonUI() {
+        isRecording = false;
+        btnRecordAudio.innerText = "🎙️";
+        btnRecordAudio.classList.remove("text-red-500", "animate-pulse");
+        btnRecordAudio.classList.add("text-green-500");
+        chatMessageField.placeholder = "Input payload text packets to transit...";
+        chatMessageField.classList.remove("border-red-900", "text-red-500");
+    }
+
+    // Dual Mode Bindings: Handles click/tap toggles AND holds across devices seamlessly
+    btnRecordAudio.addEventListener("mousedown", (e) => { 
+        e.preventDefault(); 
+        startRecordingVoice(); 
+    });
+    
+    window.addEventListener("mouseup", (e) => { 
+        if (isRecording) stopRecordingVoice(); 
+    });
+
+    btnRecordAudio.addEventListener("touchstart", (e) => { 
+        e.preventDefault(); 
+        startRecordingVoice(); 
+    }, { passive: false });
+    
+    window.addEventListener("touchend", (e) => { 
+        if (isRecording) stopRecordingVoice(); 
+    });
+
+    // Fallback UI Click Trigger for safety
+    btnRecordAudio.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (!activePeerId) return;
+        if (isRecording) {
+            stopRecordingVoice();
+        }
+    });
+
+    // --- Unified Media Packet Transmitter ---
+
+    async function sendSecureMediaPacket(rawArrayBuffer, typeFlag) {
+        if (!socket || !socket.connected || !activePeerId) return;
+
+        const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
+        const targetPublicKeyPEM = peers[activePeerId];
+
+        if (!targetPublicKeyPEM) {
+            alert("No public key verified for target peer node.");
+            return;
+        }
+
+        try {
+            const targetPubKeyObj = await importPublicKey(targetPublicKeyPEM);
+            
+            // 1. Pack the binary audio cluster through our fast Hybrid encryption matrix
+            const hybridCiphertextJson = await encryptHybridPayload(rawArrayBuffer, targetPubKeyObj);
+            const timestamp = Math.floor(Date.now() / 1000);
+
+            // 2. Wrap and transmit our structural signature package across the socket
+            const metaEncryptedMessage = "STRUCT_MEDIA_PACKET:" + typeFlag + ":" + hybridCiphertextJson;
+
+            socket.emit('send_msg', {
+                recipient_id: activePeerId,
+                encrypted_payload: metaEncryptedMessage
+            });
+
+            // 3. Store locally so you can play your own voice notes back natively
+            const localBlob = new Blob([rawArrayBuffer], { type: 'audio/webm' });
+            const localBlobUrl = URL.createObjectURL(localBlob);
+
+            const storageKey = `msg_feed_${activePeerId}`;
+            const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
+            history.push({
+                sender: 'ME',
+                type: typeFlag,
+                text: localBlobUrl, // Points straight to local device memory cache link
+                time: timestamp
+            });
+            localStorage.setItem(storageKey, JSON.stringify(history));
+            renderFeedHistory(activePeerId);
+
+        } catch (err) {
+            alert("Media packaging failure: " + err);
+        }
     }
 
     // --- Identity Backup Portability Infrastructure ---
@@ -247,7 +443,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     return;
                 }
 
-                // Commit everything into local phone storage maps directly
                 localStorage.setItem("enclave_short_id", importedData.short_id);
                 localStorage.setItem("enclave_private_jwk", JSON.stringify(importedData.private_jwk));
                 localStorage.setItem("enclave_peers", JSON.stringify(importedData.peers || {}));
@@ -347,13 +542,10 @@ document.addEventListener("DOMContentLoaded", () => {
             socket.emit('authenticate', { short_key: myShortId });
         });
 
-        socket.on('disconnect', () => {
-            console.warn("Transport connection terminated.");
-        });
-
         socket.on('receive_message', async (packet) => {
             const sender = packet.sender_id;
-            const encryptedPayload = packet.payload;
+            let rawEncryptedPayload = packet.payload;
+            let messageType = "text";
             
             const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
             if (!peers[sender]) {
@@ -369,13 +561,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const myPrivateJwk = JSON.parse(localStorage.getItem("enclave_private_jwk"));
             const privateKeyObj = await importPrivateKey(myPrivateJwk);
-            const decryptedString = await decryptPayload(encryptedPayload, privateKeyObj);
+            
+            let finalOutputStringOrUrl = "";
 
+            try {
+                // 1. DISCOVER PACKET TYPE: Isolate binary media payloads from flat text payloads
+                if (rawEncryptedPayload.startsWith("STRUCT_MEDIA_PACKET:")) {
+                    const structuralParts = rawEncryptedPayload.split(":");
+                    messageType = structuralParts[1]; // Extract type (e.g., "voice")
+                    const actualHybridJson = structuralParts.slice(2).join(":");
+
+                    // Decrypt the raw media data bytes using the hybrid block
+                    const decryptedBinaryBuffer = await decryptHybridPayload(actualHybridJson, privateKeyObj);
+                    
+                    if (decryptedBinaryBuffer) {
+                        const decryptedBlob = new Blob([decryptedBinaryBuffer], { type: 'audio/webm' });
+                        finalOutputStringOrUrl = URL.createObjectURL(decryptedBlob);
+                    } else {
+                        finalOutputStringOrUrl = "[ SYSTEM ERROR: DATA LAYER DECRYPTION VIOLATION ]";
+                        messageType = "text";
+                    }
+                } else {
+                    // 2. HYBRID TEXT PATHWAY: Incoming data is a hybrid JSON-wrapped payload matrix
+                    messageType = "text";
+                    const decryptedTextBuffer = await decryptHybridPayload(rawEncryptedPayload, privateKeyObj);
+                    
+                    if (decryptedTextBuffer) {
+                        finalOutputStringOrUrl = new TextDecoder().decode(decryptedTextBuffer);
+                    } else {
+                        // Fallback implementation: Check if packet is legacy un-hybridized plain RSA string
+                        try {
+                            const dataBytes = base64ToArrayBuffer(rawEncryptedPayload);
+                            const decryptedBytes = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKeyObj, dataBytes);
+                            finalOutputStringOrUrl = new TextDecoder().decode(decryptedBytes);
+                        } catch(legacyErr) {
+                            finalOutputStringOrUrl = "[ SYSTEM ERROR: FAILED DECRYPTION DEVIATION ]";
+                        }
+                    }
+                }
+            } catch (globalPacketErr) {
+                console.error("Critical stream parser crash: ", globalPacketErr);
+                finalOutputStringOrUrl = "[ SYSTEM ERROR: STREAM PARSER EXCEPTION ]";
+                messageType = "text";
+            }
+
+            // 3. STORAGE AND RENDER COMMIT
             const storageKey = `msg_feed_${sender}`;
             const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
             history.push({
                 sender: sender,
-                text: decryptedString,
+                type: messageType,
+                text: finalOutputStringOrUrl,
                 time: packet.timestamp || Math.floor(Date.now() / 1000)
             });
             localStorage.setItem(storageKey, JSON.stringify(history));
@@ -400,24 +636,27 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         chatMessageField.value = "";
-        
         const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
         const targetPublicKeyPEM = peers[activePeerId];
         
         try {
             const targetPubKeyObj = await importPublicKey(targetPublicKeyPEM);
-            const cipherText = await encryptPayload(txt, targetPubKeyObj);
+            const dataBuffer = new TextEncoder().encode(txt);
+            
+            // Upgrade legacy text transmission loops to also use secure hybrid payload frames
+            const hybridCiphertextJson = await encryptHybridPayload(dataBuffer.buffer, targetPubKeyObj);
             const timestamp = Math.floor(Date.now() / 1000);
             
             socket.emit('send_msg', {
                 recipient_id: activePeerId,
-                encrypted_payload: cipherText
+                encrypted_payload: hybridCiphertextJson
             });
 
             const storageKey = `msg_feed_${activePeerId}`;
             const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
             history.push({
                 sender: 'ME',
+                type: "text",
                 text: txt,
                 time: timestamp
             });

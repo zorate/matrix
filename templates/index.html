@@ -86,9 +86,15 @@
             </div>
 
             <!-- CRYPTOGRAPHIC SUBMISSION BAR -->
-            <form id="chat-input-form" class="p-3 border-t border-green-900 flex gap-2 bg-zinc-950">
-                <input type="text" id="chat-message-field" placeholder="Input payload text packets to transit..." class="flex-1 bg-black p-3 border border-green-900 text-green-400 text-xs focus:outline-none focus:border-green-500" disabled autocomplete="off"/>
-                <button type="submit" id="btn-send-message" class="px-6 bg-green-900 hover:bg-green-700 disabled:bg-zinc-900 disabled:text-gray-700 text-black font-bold text-xs tracking-widest transition" disabled>
+            <form id="chat-input-form" class="p-3 border-t border-green-900 flex gap-2 bg-zinc-950 items-center">
+                <!-- AUDIO RECORD BUTTON -->
+                <button type="button" id="btn-record-audio" class="w-10 h-10 brutalist-border bg-black text-green-500 hover:bg-green-950 hover:text-green-400 font-bold flex items-center justify-center text-lg transition disabled:opacity-30 disabled:pointer-events-none" disabled title="Hold to record voice note">
+                    🎙️
+                </button>
+                
+                <input type="text" id="chat-message-field" placeholder="Input payload text packets to transit..." class="flex-1 bg-black p-3 border border-green-900 text-green-400 text-xs focus:outline-none focus:border-green-500 transition-colors" disabled autocomplete="off"/>
+                
+                <button type="submit" id="btn-send-message" class="px-6 h-10 bg-green-900 hover:bg-green-700 disabled:bg-zinc-900 disabled:text-gray-700 text-black font-bold text-xs tracking-widest transition" disabled>
                     TRANSIT
                 </button>
             </form>
