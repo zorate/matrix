@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Identity Profile Setup</title>
+    <link rel="stylesheet" href="{{ url_with_version('static', filename='css/style.css') }}">
+</head>
+<body class="utility-page-body">
+
+    <div class="secure-container">
+        <header class="page-header">
+            <a href="/" class="back-arrow-btn">← Back to Chat</a>
+            <h2>Profile Identity</h2>
+        </header>
+
+        <main class="form-wrapper">
+            <div class="input-group">
+                <label for="aliasNameInput">Local User Alias</label>
+                <input type="text" id="aliasNameInput" placeholder="Enter your display alias..." autocomplete="off">
+            </div>
+
+            <button id="saveAliasBtn" class="action-btn-primary">Commit Identity Changes</button>
+            <div id="aliasStatusFeedback" class="status-message-area"></div>
+        </main>
+    </div>
+
+    <script src="{{ url_with_version('static', filename='js/chat.js') }}"></script>
+</body>
+</html>
