@@ -2,105 +2,138 @@
 <html lang="en" class="h-full bg-black text-green-400 font-mono">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MATRIX // ENCLAVE</title>
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .brutalist-border { border: 2px solid #047857; }
-        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #047857; }
+        
+        /* Prevent elastic pull-to-refresh behavior on mobile devices */
+        body, html { overflow: hidden; overscroll-behavior: none; }
     </style>
 </head>
-<body class="h-full flex flex-col m-0 p-4 justify-center items-center select-none bg-radial from-gray-900 to-black">
+<body class="h-full w-full flex flex-col m-0 p-0 md:p-4 justify-center items-center select-none bg-zinc-950">
 
-    <!-- SCREEN 1: GENERATION INTERFACE -->
-    <div id="activation-screen" class="hidden w-full max-w-md p-6 brutalist-border bg-black flex-col gap-4 shadow-2xl">
-        <h1 class="text-xl font-bold border-b border-green-800 pb-2 text-center text-green-500">// MATRIX NODE INITIALIZATION</h1>
-        <p class="text-xs text-gray-400 leading-relaxed">
+    <div id="activation-screen" class="hidden w-full max-w-md p-6 brutalist-border bg-black flex-col gap-4 shadow-2xl mx-4 rounded">
+        <h1 class="text-base font-bold border-b border-green-800 pb-2 text-center text-green-500 tracking-wider">// MATRIX NODE INITIALIZATION</h1>
+        <p class="text-xs text-gray-400 leading-relaxed text-justify">
             No central identity account detected. Generate a brand new local cryptographic pair or restore an existing identity token from an offline configuration backup file.
         </p>
-        <button id="btn-generate" class="w-full py-3 bg-green-900 hover:bg-green-700 text-black font-bold tracking-widest text-xs transition duration-150 active:translate-y-0.5">
-            [ INITIALIZE NEW KEYPAIR MASTER INDEX ]
+        <button id="btn-generate" class="w-full min-h-[44px] py-3 bg-green-900 hover:bg-green-700 text-black font-bold tracking-widest text-xs transition duration-150 active:translate-y-0.5 uppercase">
+            [ INITIALIZE KEYPAIR INDEX ]
         </button>
         
-        <div class="border-t border-gray-900 my-2 pt-4 flex flex-col gap-2">
-            <span class="text-[10px] text-gray-500 font-bold uppercase">Import Local Node Key File:</span>
+        <div class="border-t border-zinc-900 my-2 pt-4 flex flex-col gap-2">
+            <span class="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Import Local Node Key File:</span>
             <input type="file" id="file-import-identity" class="hidden" accept=".json" />
-            <button onclick="document.getElementById('file-import-identity').click()" class="w-full py-2 border border-dashed border-green-800 text-gray-400 hover:text-green-400 hover:border-green-500 text-xs transition">
-                [ LOAD IDENTITY BACKUP FILE (.JSON) ]
+            <button onclick="document.getElementById('file-import-identity').click()" class="w-full min-h-[44px] py-2 border border-dashed border-green-800 text-gray-400 hover:text-green-400 hover:border-green-500 text-xs transition uppercase">
+                [ LOAD IDENTITY BACKUP (.JSON) ]
             </button>
         </div>
         
         <div id="generation-status" class="text-[10px] text-yellow-600 font-bold text-center animate-pulse mt-2"></div>
     </div>
 
-    <!-- SCREEN 2: ACTIVE SECURE MATRIX COMMS TERMINAL -->
-    <div id="core-application" class="hidden w-full max-w-5xl h-[85vh] brutalist-border bg-black flex shadow-2xl">
+    <div id="core-application" class="hidden w-full max-w-5xl h-full md:h-[85vh] brutalist-border bg-black flex flex-row shadow-2xl relative overflow-hidden">
         
-        <!-- SIDEBAR INDEX CONTROLLERS -->
-        <div class="w-80 border-r border-green-900 flex flex-col bg-black">
-            <!-- CURRENT SECURE USER IDENTITY STAMP -->
-            <div class="p-4 border-b border-green-900 bg-zinc-950 flex flex-col gap-1">
-                <span class="text-[10px] text-gray-500 font-bold">LOCAL NODE LOGICAL VECTOR:</span>
+        <div id="sidebar-panel" class="w-full md:w-80 border-r border-green-900 flex flex-col bg-black absolute md:relative z-20 h-full transition-transform duration-200 transform translate-x-0 md:translate-x-0">
+            <div class="p-4 border-b border-green-900 bg-zinc-950 flex flex-col gap-1.5">
+                <span class="text-[10px] text-gray-500 font-bold tracking-wider">LOCAL NODE LOGICAL VECTOR:</span>
                 <div class="flex items-center justify-between">
                     <span id="display-my-id" class="text-sm font-bold tracking-wider text-green-500">XXX-XXX</span>
-                    <button onclick="exportIdentityToBackupFile()" class="text-[10px] bg-green-950 hover:bg-green-900 text-green-400 px-2 py-1 border border-green-800 transition" title="Backup keys for phone transfer">
+                    <button onclick="exportIdentityToBackupFile()" class="text-[10px] bg-green-950 hover:bg-green-900 text-green-400 px-3 py-1.5 border border-green-800 transition rounded" title="Backup keys for phone transfer">
                         [ BACKUP ]
                     </button>
                 </div>
             </div>
 
-            <!-- ADD NEW TARGET NODE ADAPTER -->
             <div class="p-4 border-b border-green-900 flex flex-col gap-2">
-                <span class="text-[10px] text-gray-500 font-bold">LINK PEER COMMUNICATIONS INTERFACE:</span>
+                <span class="text-[10px] text-gray-500 font-bold tracking-wider">LINK PEER COMMS INTERFACE:</span>
                 <div class="flex gap-2">
-                    <input type="text" id="input-peer-id" placeholder="XXX-XXX" class="flex-1 bg-black p-2 border border-green-900 text-green-400 text-xs focus:outline-none focus:border-green-500 uppercase tracking-widest text-center" maxlength="7"/>
-                    <button id="btn-add-peer" class="px-3 bg-green-900 hover:bg-green-700 text-black font-bold text-xs transition">+</button>
+                    <input type="text" id="input-peer-id" placeholder="XXX-XXX" class="flex-1 bg-black p-2 min-h-[40px] border border-green-900 text-green-400 text-xs focus:outline-none focus:border-green-500 uppercase tracking-widest text-center" maxlength="7"/>
+                    <button id="btn-add-peer" class="w-12 bg-green-900 hover:bg-green-700 text-black font-bold text-sm transition flex items-center justify-center rounded">+</button>
                 </div>
                 <div id="peer-lookup-status" class="text-[10px] text-gray-500 font-bold min-h-[12px]"></div>
             </div>
 
-            <!-- SORTED LIVE DIRECT ROSTER PANELS -->
             <div id="peer-list" class="flex-1 overflow-y-auto p-2 flex flex-col gap-1 bg-black"></div>
         </div>
 
-        <!-- MAIN TERMINAL SCREEN CHAT MATRIX -->
-        <div class="flex-1 flex flex-col bg-black">
-            <!-- CHAT NODE HEADER ELEMENT -->
-            <div class="p-4 border-b border-green-900 bg-zinc-950 flex items-center justify-between">
-                <div class="flex flex-col">
-                    <span id="chat-header-title" class="text-sm font-bold tracking-wider text-green-400">UNLINKED MATRIX FIELD</span>
-                    <span id="chat-header-id" class="text-[9px] text-gray-600 tracking-widest font-bold mt-0.5"></span>
+        <div class="flex-1 flex flex-col bg-black w-full h-full z-10">
+            <div class="p-3 md:p-4 border-b border-green-900 bg-zinc-950 flex items-center justify-between min-h-[60px]">
+                <button onclick="toggleMobileSidebar(true)" class="md:hidden text-xs border border-green-900 px-2.5 py-1.5 bg-zinc-900 text-green-400 rounded mr-2 font-bold tracking-wider">
+                    &lt; ROSTER
+                </button>
+                
+                <div class="flex-1 flex flex-col min-w-0">
+                    <span id="chat-header-title" class="text-xs md:text-sm font-bold tracking-wider text-green-400 truncate">UNLINKED MATRIX FIELD</span>
+                    <span id="chat-header-id" class="text-[9px] text-gray-600 tracking-widest font-bold mt-0.5 truncate"></span>
                 </div>
-                <!-- LOCAL MANAGEMENT CONTROLS -->
-                <button id="btn-manage-alias" class="hidden text-[10px] border border-green-900 px-2 py-1 hover:bg-green-950 text-gray-400 transition">
-                    [ ASSIGN ALIAS ]
+                
+                <button id="btn-manage-alias" class="hidden text-[10px] border border-green-900 px-2 py-1.5 hover:bg-green-950 text-gray-400 transition ml-2 rounded shrink-0">
+                    [ ALIAS ]
                 </button>
             </div>
 
-            <!-- DECRYPTED MESSAGE HISTORICAL STREAM -->
-            <div id="chat-feed" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-black">
-                <div class="text-center text-gray-700 my-auto text-xs">Establish secure transmission routing channels via the index panel.</div>
+            <div id="chat-feed" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-black text-justify">
+                <div class="text-center text-gray-700 my-auto text-xs tracking-wide">Establish secure transmission routing channels via the index panel.</div>
             </div>
 
-            <!-- CRYPTOGRAPHIC SUBMISSION BAR -->
-            <form id="chat-input-form" class="p-3 border-t border-green-900 flex gap-2 bg-zinc-950 items-center">
-                <!-- AUDIO RECORD BUTTON -->
-                <button type="button" id="btn-record-audio" class="w-10 h-10 brutalist-border bg-black text-green-500 hover:bg-green-950 hover:text-green-400 font-bold flex items-center justify-center text-lg transition disabled:opacity-30 disabled:pointer-events-none" disabled title="Hold to record voice note">
+            <form id="chat-input-form" class="p-2 md:p-3 border-t border-green-900 flex gap-2 bg-zinc-950 items-center">
+                <button type="button" id="btn-record-audio" class="w-11 h-11 brutalist-border bg-black text-green-500 hover:bg-green-950 hover:text-green-400 font-bold flex items-center justify-center text-lg transition disabled:opacity-30 disabled:pointer-events-none shrink-0 rounded-md" disabled title="Hold to record voice note">
                     🎙️
                 </button>
                 
-                <input type="text" id="chat-message-field" placeholder="Input payload text packets to transit..." class="flex-1 bg-black p-3 border border-green-900 text-green-400 text-xs focus:outline-none focus:border-green-500 transition-colors" disabled autocomplete="off"/>
+                <input type="text" id="chat-message-field" placeholder="Input payload text..." class="flex-1 bg-black p-3 h-11 border border-green-900 text-green-400 text-xs focus:outline-none focus:border-green-500 transition-colors rounded-none" disabled autocomplete="off"/>
                 
-                <button type="submit" id="btn-send-message" class="px-6 h-10 bg-green-900 hover:bg-green-700 disabled:bg-zinc-900 disabled:text-gray-700 text-black font-bold text-xs tracking-widest transition" disabled>
+                <button type="submit" id="btn-send-message" class="px-4 md:px-6 h-11 bg-green-900 hover:bg-green-700 disabled:bg-zinc-900 disabled:text-gray-700 text-black font-bold text-xs tracking-widest transition shrink-0 rounded-md" disabled>
                     TRANSIT
                 </button>
             </form>
         </div>
     </div>
 
+    <script>
+        function toggleMobileSidebar(show) {
+            if (window.innerWidth >= 768) return; 
+            const sidebar = document.getElementById("sidebar-panel");
+            if (show) {
+                sidebar.classList.remove("-translate-x-full");
+                sidebar.classList.add("translate-x-0");
+            } else {
+                sidebar.classList.remove("translate-x-0");
+                sidebar.classList.add("-translate-x-full");
+            }
+        }
+
+        // Intercept standard roster selection clicks to auto-slide panels on smaller screens
+        document.addEventListener("DOMContentLoaded", () => {
+            const rosterContainer = document.getElementById("peer-list");
+            
+            // Set up native state listener for window sizing checks
+            const checkLayoutContext = () => {
+                const sidebar = document.getElementById("sidebar-panel");
+                if (window.innerWidth < 768) {
+                    sidebar.classList.add("-translate-x-full");
+                } else {
+                    sidebar.classList.remove("-translate-x-full", "translate-x-0");
+                }
+            };
+            
+            window.addEventListener('resize', checkLayoutContext);
+            checkLayoutContext(); // Execute bootstrap layout context pass
+
+            rosterContainer.addEventListener("click", (e) => {
+                if (e.target.closest("button")) {
+                    toggleMobileSidebar(false);
+                }
+            });
+        });
+    </script>
     <script src="/static/js/chat.js?v=2"></script>
 </body>
 </html>
