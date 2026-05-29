@@ -19,6 +19,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileImportIdentity = document.getElementById("file-import-identity");
     const btnRecordAudio = document.getElementById("btn-record-audio");
 
+    // NEW MODAL POINTERS
+    const aliasModal = document.getElementById("alias-modal");
+    const inputAliasString = document.getElementById("input-alias-string");
+    const btnSaveAliasSubmit = document.getElementById("btn-save-alias-submit");
+
     let socket = null;
     let myShortId = localStorage.getItem("enclave_short_id");
     let activePeerId = null;
@@ -91,32 +96,27 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- HYBRID ENCRYPTION ENGINE FOR ANY DATA SIZE ---
 
     async function encryptHybridPayload(rawArrayBuffer, peerPublicKeyObj) {
-        // 1. Spin up an ephemeral, high-strength symmetric AES key
         const aesKey = await window.crypto.subtle.generateKey(
             { name: "AES-GCM", length: 256 },
             true,
             ["encrypt"]
         );
 
-        // 2. Encrypt the raw data with that AES key
-        const iv = window.crypto.getRandomValues(new Uint8Array(12)); // Initialization Vector
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
         const encryptedDataBuffer = await window.crypto.subtle.encrypt(
             { name: "AES-GCM", iv: iv },
             aesKey,
             rawArrayBuffer
         );
 
-        // 3. Export the raw AES key material so we can protect it via RSA
         const exportedAesRaw = await window.crypto.subtle.exportKey("raw", aesKey);
 
-        // 4. Encrypt the raw AES key using the peer's public RSA key
         const encryptedAesKeyBuffer = await window.crypto.subtle.encrypt(
             { name: "RSA-OAEP" },
             peerPublicKeyObj,
             exportedAesRaw
         );
 
-        // 5. Serialize all components to Base64 to build our combined packet payload
         return JSON.stringify({
             enc_key: arrayBufferToBase64(encryptedAesKeyBuffer),
             iv: arrayBufferToBase64(iv),
@@ -132,14 +132,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const iv = new Uint8Array(base64ToArrayBuffer(packageObj.iv));
             const ciphertextBuffer = base64ToArrayBuffer(packageObj.ciphertext);
 
-            // 1. Decrypt the symmetric AES key using our unique private RSA key
             const rawAesKeyBuffer = await window.crypto.subtle.decrypt(
                 { name: "RSA-OAEP" },
                 myPrivateKeyObj,
                 encryptedAesKeyBuffer
             );
 
-            // 2. Re-import the raw AES key material back into the sandbox browser context
             const aesKey = await window.crypto.subtle.importKey(
                 "raw",
                 rawAesKeyBuffer,
@@ -148,7 +146,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 ["decrypt"]
             );
 
-            // 3. Decrypt the primary cipher container straight back to raw binary bytes
             return await window.crypto.subtle.decrypt(
                 { name: "AES-GCM", iv: iv },
                 aesKey,
@@ -207,22 +204,23 @@ document.addEventListener("DOMContentLoaded", () => {
         renderFeedHistory(peerId);
     }
 
-    btnManageAlias.onclick = () => {
+    // UPDATED: Alias Assignment is now managed by the explicit modal button trigger
+    btnSaveAliasSubmit.onclick = () => {
         if (!activePeerId) return;
         const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
-        const currentAlias = aliases[activePeerId] || "";
+        const newAlias = inputAliasString.value.trim();
         
-        const newAlias = prompt(`Assign local contact name for node [ ${activePeerId} ] :`, currentAlias);
-        if (newAlias === null) return;
-        
-        if (newAlias.trim() === "") {
+        if (newAlias === "") {
             delete aliases[activePeerId];
         } else {
-            aliases[activePeerId] = newAlias.trim();
+            aliases[activePeerId] = newAlias;
         }
         
         localStorage.setItem("matrix_contact_aliases", JSON.stringify(aliases));
         chatHeaderTitle.innerText = aliases[activePeerId] ? aliases[activePeerId] : `NODE: ${activePeerId}`;
+        
+        // Hide overlay upon configuration save
+        aliasModal.classList.add("hidden");
         loadPeerRoster();
     };
 
@@ -243,7 +241,6 @@ document.addEventListener("DOMContentLoaded", () => {
             
             let payloadHtml = "";
             
-            // Check if packet data stream contains a structured voice note signature
             if (msg.type === "voice") {
                 payloadHtml = `
                     <div class="p-2 brutalist-border bg-zinc-950 mt-1 rounded flex items-center gap-2">
@@ -283,15 +280,12 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             mediaRecorder.onstop = async () => {
-                // Terminate recording devices gracefully to save battery
                 stream.getTracks().forEach(track => track.stop());
-                
                 if (audioChunks.length === 0) return;
                 
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 const arrayBuffer = await audioBlob.arrayBuffer();
                 
-                // Route directly to transmission handler
                 await sendSecureMediaPacket(arrayBuffer, "voice");
             };
 
@@ -324,7 +318,6 @@ document.addEventListener("DOMContentLoaded", () => {
         chatMessageField.classList.remove("border-red-900", "text-red-500");
     }
 
-    // Dual Mode Bindings: Handles click/tap toggles AND holds across devices seamlessly
     btnRecordAudio.addEventListener("mousedown", (e) => { 
         e.preventDefault(); 
         startRecordingVoice(); 
@@ -343,7 +336,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isRecording) stopRecordingVoice(); 
     });
 
-    // Fallback UI Click Trigger for safety
     btnRecordAudio.addEventListener("click", (e) => {
         e.preventDefault();
         if (!activePeerId) return;
@@ -367,12 +359,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const targetPubKeyObj = await importPublicKey(targetPublicKeyPEM);
-            
-            // 1. Pack the binary audio cluster through our fast Hybrid encryption matrix
             const hybridCiphertextJson = await encryptHybridPayload(rawArrayBuffer, targetPubKeyObj);
             const timestamp = Math.floor(Date.now() / 1000);
-
-            // 2. Wrap and transmit our structural signature package across the socket
             const metaEncryptedMessage = "STRUCT_MEDIA_PACKET:" + typeFlag + ":" + hybridCiphertextJson;
 
             socket.emit('send_msg', {
@@ -380,7 +368,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 encrypted_payload: metaEncryptedMessage
             });
 
-            // 3. Store locally so you can play your own voice notes back natively
             const localBlob = new Blob([rawArrayBuffer], { type: 'audio/webm' });
             const localBlobUrl = URL.createObjectURL(localBlob);
 
@@ -389,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
             history.push({
                 sender: 'ME',
                 type: typeFlag,
-                text: localBlobUrl, // Points straight to local device memory cache link
+                text: localBlobUrl,
                 time: timestamp
             });
             localStorage.setItem(storageKey, JSON.stringify(history));
@@ -461,12 +448,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function bootstrapNode() {
         if (!myShortId) {
+            // UPDATED: Standard toggle for full-bleed modal deployment layout
             activationScreen.classList.remove("hidden");
             activationScreen.classList.add("flex");
+            coreApplication.classList.add("hidden");
             return;
         }
 
         activationScreen.classList.add("hidden");
+        activationScreen.classList.remove("flex");
         coreApplication.classList.remove("hidden");
         coreApplication.classList.add("flex");
         myIdDisplay.innerText = myShortId;
@@ -565,13 +555,11 @@ document.addEventListener("DOMContentLoaded", () => {
             let finalOutputStringOrUrl = "";
 
             try {
-                // 1. DISCOVER PACKET TYPE: Isolate binary media payloads from flat text payloads
                 if (rawEncryptedPayload.startsWith("STRUCT_MEDIA_PACKET:")) {
                     const structuralParts = rawEncryptedPayload.split(":");
-                    messageType = structuralParts[1]; // Extract type (e.g., "voice")
+                    messageType = structuralParts[1];
                     const actualHybridJson = structuralParts.slice(2).join(":");
 
-                    // Decrypt the raw media data bytes using the hybrid block
                     const decryptedBinaryBuffer = await decryptHybridPayload(actualHybridJson, privateKeyObj);
                     
                     if (decryptedBinaryBuffer) {
@@ -582,14 +570,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         messageType = "text";
                     }
                 } else {
-                    // 2. HYBRID TEXT PATHWAY: Incoming data is a hybrid JSON-wrapped payload matrix
                     messageType = "text";
                     const decryptedTextBuffer = await decryptHybridPayload(rawEncryptedPayload, privateKeyObj);
                     
                     if (decryptedTextBuffer) {
                         finalOutputStringOrUrl = new TextDecoder().decode(decryptedTextBuffer);
                     } else {
-                        // Fallback implementation: Check if packet is legacy un-hybridized plain RSA string
                         try {
                             const dataBytes = base64ToArrayBuffer(rawEncryptedPayload);
                             const decryptedBytes = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKeyObj, dataBytes);
@@ -605,7 +591,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 messageType = "text";
             }
 
-            // 3. STORAGE AND RENDER COMMIT
             const storageKey = `msg_feed_${sender}`;
             const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
             history.push({
@@ -643,7 +628,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const targetPubKeyObj = await importPublicKey(targetPublicKeyPEM);
             const dataBuffer = new TextEncoder().encode(txt);
             
-            // Upgrade legacy text transmission loops to also use secure hybrid payload frames
             const hybridCiphertextJson = await encryptHybridPayload(dataBuffer.buffer, targetPubKeyObj);
             const timestamp = Math.floor(Date.now() / 1000);
             
