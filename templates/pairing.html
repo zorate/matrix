@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Secure Peer Pairing</title>
+    <link rel="stylesheet" href="{{ url_with_version('static', filename='css/style.css') }}">
+</head>
+<body class="utility-page-body">
+
+    <div class="secure-container">
+        <header class="page-header">
+            <a href="/" class="back-arrow-btn">← Back to Chat</a>
+            <h2>Establish Secure Pipeline</h2>
+        </header>
+
+        <main class="form-wrapper">
+            <div class="instruction-card">
+                <p>Input your contact's unique 6-character identity key to exchange cryptographic handshakes and initialize an end-to-end encrypted session.</p>
+            </div>
+
+            <div class="input-group">
+                <label for="peerKeyInput">Target Identity Key</label>
+                <input type="text" id="peerKeyInput" maxlength="6" placeholder="e.g., X9R2ZT" autocomplete="off" bytes-target>
+            </div>
+
+            <button id="executePairingBtn" class="action-btn-primary">Initialize Secure Connection</button>
+            
+            <div id="pairingStatusFeedback" class="status-message-area"></div>
+        </main>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="{{ url_with_version('static', filename='js/crypto_engine.js') }}"></script>
+    <script src="{{ url_with_version('static', filename='js/chat.js') }}"></script>
+</body>
+</html>
