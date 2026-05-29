@@ -78,9 +78,18 @@ active_rooms = defaultdict(set) # short_key -> sids
 
 @app.route('/')
 def index():
-    """Serves the single-page minimalist user interface."""
+    # This is now your main chat interface screen
     return render_template('index.html')
 
+@app.route('/pairing')
+def pairing():
+    # Dedicated page for inputting identity keys and pairing peers
+    return render_template('pairing.html')
+
+@app.route('/alias')
+def alias():
+    # Dedicated page for managing usernames and local profiles
+    return render_template('alias.html')
 @app.route('/api/identity/register', methods=['POST'])
 def register_identity():
     """Maps a locally generated cryptographic public key to a unique pointer identifier."""
