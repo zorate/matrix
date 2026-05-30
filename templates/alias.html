@@ -10,7 +10,6 @@
         body, html { overflow: hidden; overscroll-behavior: none; }
     </style>
 </head>
-</head>
 <body class="utility-page-body">
 
     <div class="secure-container">
@@ -30,6 +29,6 @@
         </main>
     </div>
 
-    <script src="{{ url_with_version('static', filename='js/chat.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 </body>
 </html>
