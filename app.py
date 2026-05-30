@@ -10,7 +10,8 @@ from utils.crypto import generate_short_id, validate_short_id
 from dotenv import load_dotenv
 from pymongo.errors import ConfigurationError, ServerSelectionTimeoutError
 
-# REMOVED: from anyio import ASGIWrapper
+# Import the official engineio ASGI application wrapper
+import engineio
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
@@ -18,8 +19,8 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 # Initialize SocketIO normally
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# This works natively out of the box without any extra imports
-asgi_app = socketio.asgi_app
+# Create the explicit ASGI application target for Uvicorn
+asgi_app = engineio.ASGIApp(socketio.server, app)
 
 load_dotenv()
 # MongoDB Connection Setup
