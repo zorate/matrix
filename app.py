@@ -10,16 +10,15 @@ from utils.crypto import generate_short_id, validate_short_id
 from dotenv import load_dotenv
 from pymongo.errors import ConfigurationError, ServerSelectionTimeoutError
 
-# Import ASGI wrapper for Uvicorn compatibility
-from anyio import ASGIWrapper
+# REMOVED: from anyio import ASGIWrapper
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 
-# Initialize SocketIO without forcing specialized background drivers
+# Initialize SocketIO normally
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Create the ASGI application wrapper target for Uvicorn
+# This works natively out of the box without any extra imports
 asgi_app = socketio.asgi_app
 
 load_dotenv()
