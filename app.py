@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from pymongo.errors import ConfigurationError, ServerSelectionTimeoutError
 
 # Import the official engineio ASGI application wrapper
-import engineio
+#import engineio
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
@@ -20,7 +20,7 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Create the explicit ASGI application target for Uvicorn
-asgi_app = engineio.ASGIApp(socketio.server, app)
+#asgi_app = engineio.ASGIApp(socketio.server, app)
 
 load_dotenv()
 # MongoDB Connection Setup
