@@ -5,9 +5,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnGenerate = document.getElementById("btn-generate");
     const genStatus = document.getElementById("generation-status");
     const myIdDisplay = document.getElementById("display-my-id");
-    const inputPeerId = document.getElementById("input-peer-id");
-    const btnAddPeer = document.getElementById("btn-add-peer");
-    const peerLookupStatus = document.getElementById("peer-lookup-status");
     const peerListContainer = document.getElementById("peer-list");
     const chatHeaderTitle = document.getElementById("chat-header-title");
     const chatHeaderId = document.getElementById("chat-header-id");
@@ -19,11 +16,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileImportIdentity = document.getElementById("file-import-identity");
     const btnRecordAudio = document.getElementById("btn-record-audio");
 
-    // NEW MODAL POINTERS
-    const aliasModal = document.getElementById("alias-modal");
-    const inputAliasString = document.getElementById("input-alias-string");
-    const btnSaveAliasSubmit = document.getElementById("btn-save-alias-submit");
-
     let socket = null;
     let myShortId = localStorage.getItem("enclave_short_id");
     let activePeerId = null;
@@ -31,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Audio Recorder States
     let mediaRecorder = null;
     let audioChunks = [];
+    let isRecording = false;
 
     // --- Cryptographic Helper Subsystems ---
 
@@ -157,9 +150,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // --- Interface State & Contact Alias Management ---
+    // --- Interface State Management ---
 
     function loadPeerRoster() {
+        if (!peerListContainer) return;
         peerListContainer.innerHTML = "";
         const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
         const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
@@ -191,40 +185,21 @@ document.addEventListener("DOMContentLoaded", () => {
         activePeerId = peerId;
         const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
         
-        chatHeaderTitle.innerText = aliases[peerId] ? aliases[peerId] : `NODE: ${peerId}`;
-        chatHeaderId.innerText = `VECTOR REFERENCE: // ${peerId}`;
+        if (chatHeaderTitle) chatHeaderTitle.innerText = aliases[peerId] ? aliases[peerId] : `NODE: ${peerId}`;
+        if (chatHeaderId) chatHeaderId.innerText = `VECTOR REFERENCE: // ${peerId}`;
         
-        btnManageAlias.classList.remove("hidden");
-        chatMessageField.disabled = false;
-        btnSendMessage.disabled = false;
-        btnRecordAudio.disabled = false;
+        if (btnManageAlias) btnManageAlias.classList.remove("hidden");
+        if (chatMessageField) chatMessageField.disabled = false;
+        if (btnSendMessage) btnSendMessage.disabled = false;
+        if (btnRecordAudio) btnRecordAudio.disabled = false;
         
         document.getElementById(`unread-${peerId}`)?.classList.add("hidden");
         loadPeerRoster(); 
         renderFeedHistory(peerId);
     }
 
-    // UPDATED: Alias Assignment is now managed by the explicit modal button trigger
-    btnSaveAliasSubmit.onclick = () => {
-        if (!activePeerId) return;
-        const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
-        const newAlias = inputAliasString.value.trim();
-        
-        if (newAlias === "") {
-            delete aliases[activePeerId];
-        } else {
-            aliases[activePeerId] = newAlias;
-        }
-        
-        localStorage.setItem("matrix_contact_aliases", JSON.stringify(aliases));
-        chatHeaderTitle.innerText = aliases[activePeerId] ? aliases[activePeerId] : `NODE: ${activePeerId}`;
-        
-        // Hide overlay upon configuration save
-        aliasModal.classList.add("hidden");
-        loadPeerRoster();
-    };
-
     function renderFeedHistory(peerId) {
+        if (!chatFeed) return;
         chatFeed.innerHTML = "";
         const storageKey = `msg_feed_${peerId}`;
         const feeds = JSON.parse(localStorage.getItem(storageKey) || "[]");
@@ -266,8 +241,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Audio Voice Recording Engine ---
 
-    let isRecording = false;
-
     async function startRecordingVoice() {
         if (!activePeerId || isRecording) return;
         audioChunks = [];
@@ -291,11 +264,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
             mediaRecorder.start();
             isRecording = true;
-            btnRecordAudio.innerText = "🛑";
-            btnRecordAudio.classList.remove("text-green-500");
-            btnRecordAudio.classList.add("text-red-500", "animate-pulse");
-            chatMessageField.placeholder = "!!! RECORDING RAW SECURE AUDIO PAYLOAD DIRECTLY FROM CAPTURE LAYER !!!";
-            chatMessageField.classList.add("border-red-900", "text-red-500");
+            if (btnRecordAudio) {
+                btnRecordAudio.innerText = "🛑";
+                btnRecordAudio.classList.remove("text-green-500");
+                btnRecordAudio.classList.add("text-red-500", "animate-pulse");
+            }
+            if (chatMessageField) {
+                chatMessageField.placeholder = "!!! RECORDING RAW SECURE AUDIO PAYLOAD DIRECTLY FROM CAPTURE LAYER !!!";
+                chatMessageField.classList.add("border-red-900", "text-red-500");
+            }
         } catch (err) {
             alert("Microphone capture permission request rejected: " + err);
             resetRecordButtonUI();
@@ -311,37 +288,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function resetRecordButtonUI() {
         isRecording = false;
-        btnRecordAudio.innerText = "🎙️";
-        btnRecordAudio.classList.remove("text-red-500", "animate-pulse");
-        btnRecordAudio.classList.add("text-green-500");
-        chatMessageField.placeholder = "Input payload text packets to transit...";
-        chatMessageField.classList.remove("border-red-900", "text-red-500");
+        if (btnRecordAudio) {
+            btnRecordAudio.innerText = "🎙️";
+            btnRecordAudio.classList.remove("text-red-500", "animate-pulse");
+            btnRecordAudio.classList.add("text-green-500");
+        }
+        if (chatMessageField) {
+            chatMessageField.placeholder = "Input payload text packets to transit...";
+            chatMessageField.classList.remove("border-red-900", "text-red-500");
+        }
     }
 
-    btnRecordAudio.addEventListener("mousedown", (e) => { 
-        e.preventDefault(); 
-        startRecordingVoice(); 
-    });
+    if (btnRecordAudio) {
+        btnRecordAudio.addEventListener("mousedown", (e) => { 
+            e.preventDefault(); 
+            startRecordingVoice(); 
+        });
+        
+        btnRecordAudio.addEventListener("touchstart", (e) => { 
+            e.preventDefault(); 
+            startRecordingVoice(); 
+        }, { passive: false });
+
+        btnRecordAudio.addEventListener("click", (e) => {
+            e.preventDefault();
+            if (!activePeerId) return;
+            if (isRecording) stopRecordingVoice();
+        });
+    }
     
     window.addEventListener("mouseup", (e) => { 
         if (isRecording) stopRecordingVoice(); 
     });
-
-    btnRecordAudio.addEventListener("touchstart", (e) => { 
-        e.preventDefault(); 
-        startRecordingVoice(); 
-    }, { passive: false });
     
     window.addEventListener("touchend", (e) => { 
         if (isRecording) stopRecordingVoice(); 
-    });
-
-    btnRecordAudio.addEventListener("click", (e) => {
-        e.preventDefault();
-        if (!activePeerId) return;
-        if (isRecording) {
-            stopRecordingVoice();
-        }
     });
 
     // --- Unified Media Packet Transmitter ---
@@ -417,112 +398,92 @@ document.addEventListener("DOMContentLoaded", () => {
         URL.revokeObjectURL(url);
     };
 
-    fileImportIdentity.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
+    if (fileImportIdentity) {
+        fileImportIdentity.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-            try {
-                const importedData = JSON.parse(evt.target.result);
-                if (!importedData.short_id || !importedData.private_jwk) {
-                    alert("Fatal: Cryptographic key vectors are missing from backup structural syntax.");
-                    return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const importedData = JSON.parse(evt.target.result);
+                    if (!importedData.short_id || !importedData.private_jwk) {
+                        alert("Fatal: Cryptographic key vectors are missing from backup structural syntax.");
+                        return;
+                    }
+
+                    localStorage.setItem("enclave_short_id", importedData.short_id);
+                    localStorage.setItem("enclave_private_jwk", JSON.stringify(importedData.private_jwk));
+                    localStorage.setItem("enclave_peers", JSON.stringify(importedData.peers || {}));
+                    localStorage.setItem("matrix_contact_aliases", JSON.stringify(importedData.aliases || {}));
+
+                    alert("Cryptographic matrix context imported perfectly! Activating application node...");
+                    window.location.reload();
+                } catch(err) {
+                    alert("Error reading key package mapping layers: " + err);
                 }
-
-                localStorage.setItem("enclave_short_id", importedData.short_id);
-                localStorage.setItem("enclave_private_jwk", JSON.stringify(importedData.private_jwk));
-                localStorage.setItem("enclave_peers", JSON.stringify(importedData.peers || {}));
-                localStorage.setItem("matrix_contact_aliases", JSON.stringify(importedData.aliases || {}));
-
-                alert("Cryptographic matrix context imported perfectly! Activating application node...");
-                window.location.reload();
-            } catch(err) {
-                alert("Error reading key package mapping layers: " + err);
-            }
+            };
+            reader.readAsText(file);
         };
-        reader.readAsText(file);
-    };
+    }
 
     // --- Initialization and Orchestration Pipelines ---
 
     async function bootstrapNode() {
         if (!myShortId) {
-            // UPDATED: Standard toggle for full-bleed modal deployment layout
-            activationScreen.classList.remove("hidden");
-            activationScreen.classList.add("flex");
-            coreApplication.classList.add("hidden");
+            if (activationScreen && coreApplication) {
+                activationScreen.classList.remove("hidden");
+                activationScreen.classList.add("flex");
+                coreApplication.classList.add("hidden");
+            }
             return;
         }
 
-        activationScreen.classList.add("hidden");
-        activationScreen.classList.remove("flex");
-        coreApplication.classList.remove("hidden");
-        coreApplication.classList.add("flex");
-        myIdDisplay.innerText = myShortId;
+        if (activationScreen && coreApplication) {
+            activationScreen.classList.add("hidden");
+            activationScreen.classList.remove("flex");
+            coreApplication.classList.remove("hidden");
+            coreApplication.classList.add("flex");
+        }
+        if (myIdDisplay) myIdDisplay.innerText = myShortId;
         
         loadPeerRoster();
         initializeWebsocketSession();
     }
 
-    btnGenerate.onclick = async () => {
-        btnGenerate.disabled = true;
-        genStatus.innerText = "COMPUTING CRYPTOGRAPHIC ENCLAVE IDENTITY PAIR...";
-        
-        try {
-            const keyPair = await generateEnclaveKeyPair();
-            const exportedPublic = await exportPublicKey(keyPair.publicKey);
-            const exportedPrivateJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
+    if (btnGenerate) {
+        btnGenerate.onclick = async () => {
+            btnGenerate.disabled = true;
+            if (genStatus) genStatus.innerText = "COMPUTING CRYPTOGRAPHIC ENCLAVE IDENTITY PAIR...";
             
-            const response = await fetch('/api/identity/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ public_key: exportedPublic })
-            });
+            try {
+                const keyPair = await generateEnclaveKeyPair();
+                const exportedPublic = await exportPublicKey(keyPair.publicKey);
+                const exportedPrivateJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
+                
+                const response = await fetch('/api/identity/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ public_key: exportedPublic })
+                });
 
-            const responseData = await response.json();
-            if (response.ok) {
-                localStorage.setItem("enclave_short_id", responseData.short_key);
-                localStorage.setItem("enclave_private_jwk", JSON.stringify(exportedPrivateJwk));
-                localStorage.setItem("enclave_peers", JSON.stringify({}));
-                myShortId = responseData.short_key;
-                bootstrapNode();
-            } else {
-                genStatus.innerText = `ERR: ${responseData.error}`;
+                const responseData = await response.json();
+                if (response.ok) {
+                    localStorage.setItem("enclave_short_id", responseData.short_key);
+                    localStorage.setItem("enclave_private_jwk", JSON.stringify(exportedPrivateJwk));
+                    localStorage.setItem("enclave_peers", JSON.stringify({}));
+                    myShortId = responseData.short_key;
+                    bootstrapNode();
+                } else {
+                    if (genStatus) genStatus.innerText = `ERR: ${responseData.error}`;
+                    btnGenerate.disabled = false;
+                }
+            } catch (err) {
+                if (genStatus) genStatus.innerText = `FATAL RUNTIME CONFIGURATION FAIL: ${err}`;
                 btnGenerate.disabled = false;
             }
-        } catch (err) {
-            genStatus.innerText = `FATAL RUNTIME CONFIGURATION FAIL: ${err}`;
-            btnGenerate.disabled = false;
-        }
-    };
-
-    btnAddPeer.onclick = async () => {
-        const lookupVal = inputPeerId.value.toUpperCase().trim();
-        if(!lookupVal || lookupVal.length !== 7) {
-            peerLookupStatus.innerText = "Error: Use XXX-XXX layout.";
-            return;
-        }
-        peerLookupStatus.innerText = "Querying cluster indexes...";
-        
-        try {
-            const res = await fetch(`/api/identity/lookup/${lookupVal}`);
-            const data = await res.json();
-            
-            if(res.ok) {
-                const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
-                peers[lookupVal] = data.public_key;
-                localStorage.setItem("enclave_peers", JSON.stringify(peers));
-                peerLookupStatus.innerText = "Handshake resolved. Node appended.";
-                inputPeerId.value = "";
-                loadPeerRoster();
-            } else {
-                peerLookupStatus.innerText = `Failed: ${data.error}`;
-            }
-        } catch(e) {
-            peerLookupStatus.innerText = "Network pipeline timeout.";
-        }
-    };
+        };
+    }
 
     function initializeWebsocketSession() {
         socket = io();
@@ -610,47 +571,49 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    chatInputForm.onsubmit = async (e) => {
-        e.preventDefault();
-        const txt = chatMessageField.value.trim();
-        if(!txt || !activePeerId) return;
+    if (chatInputForm) {
+        chatInputForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const txt = chatMessageField.value.trim();
+            if(!txt || !activePeerId) return;
 
-        if (!socket || !socket.connected) {
-            alert("Transmission pipeline offline. Unable to complete packet exchange.");
-            return;
-        }
+            if (!socket || !socket.connected) {
+                alert("Transmission pipeline offline. Unable to complete packet exchange.");
+                return;
+            }
 
-        chatMessageField.value = "";
-        const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
-        const targetPublicKeyPEM = peers[activePeerId];
-        
-        try {
-            const targetPubKeyObj = await importPublicKey(targetPublicKeyPEM);
-            const dataBuffer = new TextEncoder().encode(txt);
+            chatMessageField.value = "";
+            const peers = JSON.parse(localStorage.getItem("enclave_peers") || "{}");
+            const targetPublicKeyPEM = peers[activePeerId];
             
-            const hybridCiphertextJson = await encryptHybridPayload(dataBuffer.buffer, targetPubKeyObj);
-            const timestamp = Math.floor(Date.now() / 1000);
-            
-            socket.emit('send_msg', {
-                recipient_id: activePeerId,
-                encrypted_payload: hybridCiphertextJson
-            });
+            try {
+                const targetPubKeyObj = await importPublicKey(targetPublicKeyPEM);
+                const dataBuffer = new TextEncoder().encode(txt);
+                
+                const hybridCiphertextJson = await encryptHybridPayload(dataBuffer.buffer, targetPubKeyObj);
+                const timestamp = Math.floor(Date.now() / 1000);
+                
+                socket.emit('send_msg', {
+                    recipient_id: activePeerId,
+                    encrypted_payload: hybridCiphertextJson
+                });
 
-            const storageKey = `msg_feed_${activePeerId}`;
-            const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
-            history.push({
-                sender: 'ME',
-                type: "text",
-                text: txt,
-                time: timestamp
-            });
-            localStorage.setItem(storageKey, JSON.stringify(history));
-            renderFeedHistory(activePeerId);
+                const storageKey = `msg_feed_${activePeerId}`;
+                const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
+                history.push({
+                    sender: 'ME',
+                    type: "text",
+                    text: txt,
+                    time: timestamp
+                });
+                localStorage.setItem(storageKey, JSON.stringify(history));
+                renderFeedHistory(activePeerId);
 
-        } catch(err) {
-            alert("Cryptographic processing failure: " + err);
-        }
-    };
+            } catch(err) {
+                alert("Cryptographic processing failure: " + err);
+            }
+        };
+    }
 
     bootstrapNode();
 });
