@@ -17,15 +17,27 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 
 # Initialize SocketIO normally
-socketio = SocketIO(app, cors_allowed_origins="*")
-
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="eventlet"
+)
 # Create the explicit ASGI application target for Uvicorn
 #asgi_app = engineio.ASGIApp(socketio.server, app)
 
 load_dotenv()
-# MongoDB Connection Setup
-MONGO_URI = os.getenv('MONGO_URI')
-mongo_client = MongoClient(MONGO_URI)
+
+MONGO_URI = os.getenv("MONGO_URI")
+
+if not MONGO_URI:
+    print("MONGO_URI missing")
+    sys.exit(1)
+
+mongo_client = MongoClient(
+    MONGO_URI,
+    serverSelectionTimeoutMS=5000
+)
+
 db = mongo_client["TrustCheck"]
 
 if not MONGO_URI:
