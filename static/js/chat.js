@@ -427,26 +427,39 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+
+
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const id = localStorage.getItem("enclave_short_id");
+
+        if (!id) {
+            document.getElementById("core-application")?.classList.add("hidden");
+            document.getElementById("activation-screen")?.classList.remove("hidden");
+        }
+    });
+    
     // --- Initialization and Orchestration Pipelines ---
 
     async function bootstrapNode() {
+        myShortId = localStorage.getItem("enclave_short_id");
+
+        // CASE 1: NO ID → activation mode
         if (!myShortId) {
-            if (activationScreen && coreApplication) {
-                activationScreen.classList.remove("hidden");
-                activationScreen.classList.add("flex");
-                coreApplication.classList.add("hidden");
-            }
+            activationScreen?.classList.remove("hidden");
+            coreApplication?.classList.add("hidden");
+
+            if (genStatus) genStatus.innerText = "Identity required to initialize node.";
+
             return;
         }
 
-        if (activationScreen && coreApplication) {
-            activationScreen.classList.add("hidden");
-            activationScreen.classList.remove("flex");
-            coreApplication.classList.remove("hidden");
-            coreApplication.classList.add("flex");
-        }
+        // CASE 2: HAS ID → app mode
+        activationScreen?.classList.add("hidden");
+        coreApplication?.classList.remove("hidden");
+
         if (myIdDisplay) myIdDisplay.innerText = myShortId;
-        
+
         loadPeerRoster();
         initializeWebsocketSession();
     }
