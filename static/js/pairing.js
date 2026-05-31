@@ -8,12 +8,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const lookupVal = inputPeerId.value.toUpperCase().trim();
 
-        if (!lookupVal || lookupVal.length !== 7) {
+        const idPattern = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
+
+        if (!idPattern.test(lookupVal)) {
             peerLookupStatus.textContent =
-                "Error: Identity key must be exactly 6 characters.";
+                "Error: Use format XXX-XXX";
             return;
         }
-
+        
         peerLookupStatus.textContent =
             "Querying cluster indexes...";
 
