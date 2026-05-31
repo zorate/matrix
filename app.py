@@ -20,7 +20,7 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode="eventlet"
+    async_mode="threading"
 )
 # Create the explicit ASGI application target for Uvicorn
 #asgi_app = engineio.ASGIApp(socketio.server, app)
