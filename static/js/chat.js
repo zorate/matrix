@@ -183,6 +183,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function selectPeerChat(peerId) {
         activePeerId = peerId;
+
+        localStorage.setItem("matrix_active_peer_context", peerId);
+        
         const aliases = JSON.parse(localStorage.getItem("matrix_contact_aliases") || "{}");
         
         if (chatHeaderTitle) chatHeaderTitle.innerText = aliases[peerId] ? aliases[peerId] : `NODE: ${peerId}`;
