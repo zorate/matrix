@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const lookupVal = inputPeerId.value.toUpperCase().trim();
 
-        if (!lookupVal || lookupVal.length !== 6) {
+        if (!lookupVal || lookupVal.length !== 7) {
             peerLookupStatus.textContent =
                 "Error: Identity key must be exactly 6 characters.";
             return;
